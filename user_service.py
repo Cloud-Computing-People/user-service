@@ -37,3 +37,12 @@ async def createUser(user: User):
     except:
         raise HTTPException(status_code=500)
     return user
+
+@app.put('/users/{userId}')
+async def updateUser(userId: int, user: User):
+    sql = updateUserSQL(userId, user)
+    try:
+        cursor.execute(sql)
+    except:
+        raise HTTPException(status_code=500)
+    return user
