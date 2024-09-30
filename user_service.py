@@ -9,10 +9,16 @@ from sql_queries import *
 load_dotenv()
 
 app = FastAPI()
-connection = pymysql.connect(host=os.getenv("DB_HOST"), user=os.getenv("DB_USER"), password=os.getenv("DB_PASSWORD"), database="userdb")
+connection = pymysql.connect(
+    host=os.getenv("DB_HOST"),
+    user=os.getenv("DB_USER"),
+    password=os.getenv("DB_PASSWORD"),
+    database="userdb",
+)
 cursor = connection.cursor(pymysql.cursors.DictCursor)
 
-@app.get('/users/{userId}')
+
+@app.get("/users/{userId}")
 async def getUser(userId):
     sql = getUserByIdSQL(userId)
     cursor.execute(sql)
@@ -21,14 +27,16 @@ async def getUser(userId):
         raise HTTPException(status_code=404, detail="User not found")
     return ret
 
-@app.get('/users')
+
+@app.get("/users")
 async def getUsers():
     sql = getUsersSQL()
     cursor.execute(sql)
     ret = [row for row in cursor]
     return ret
 
-@app.post('/users')
+
+@app.post("/users")
 async def createUser(user: User):
     sql = createUserSQL(user.id, user.username, user.email, user.isAdmin)
     print(sql)
@@ -38,7 +46,8 @@ async def createUser(user: User):
         raise HTTPException(status_code=500)
     return user
 
-@app.put('/users/{userId}')
+
+@app.put("/users/{userId}")
 async def updateUser(userId: int, user: User):
     sql = updateUserSQL(userId, user)
     try:
@@ -46,3 +55,9 @@ async def updateUser(userId: int, user: User):
     except:
         raise HTTPException(status_code=500)
     return user
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(app, host="127.0.0.1", port=8000)
