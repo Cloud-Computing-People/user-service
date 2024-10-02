@@ -1,6 +1,7 @@
 import os
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Depends
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import pymysql
 from user_types import *
@@ -9,6 +10,9 @@ from sql_queries import *
 load_dotenv()
 
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"]
+)
 connection = pymysql.connect(
     host=os.getenv("DB_HOST"),
     user=os.getenv("DB_USER"),
@@ -60,4 +64,4 @@ async def updateUser(userId: int, user: User):
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    uvicorn.run(app, host="127.0.0.1", port=8002)
