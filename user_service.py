@@ -1,15 +1,47 @@
 import os
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Query, Path, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import pymysql
-from user_types import *
+from pymysql import MySQLError
+from models import *
 from sql_queries import *
+from typing import Annotated, List
+from utils import *
 
 load_dotenv()
 
-app = FastAPI()
+title = "User Service"
+description = """
+The user service manages all user-related activities, including:
+login and authorization, checking game and marketplace access, and
+reading and updating user attributes (username, profile picture, bio,
+admin status, etc.). 
+
+Functionality includes the ability to:
+* Get attributes for all existing users.
+* Get attributes for a specific user by user ID.
+* Update attributes for a specific user by user ID.
+* Create a new user.
+"""
+version = "0.0.1"
+
+tags_metadata = [
+    {
+        "name": "Users",
+        "description": "Basic operations on users."
+    }
+]
+
+app = FastAPI(
+    title=title,
+    description=description,
+    version=version,
+    openapi_tags=tags_metadata
+)
+
 app.add_middleware(
     CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"]
 )
@@ -22,43 +54,124 @@ connection = pymysql.connect(
 cursor = connection.cursor(pymysql.cursors.DictCursor)
 
 
-@app.get("/users/{userId}")
-async def getUser(userId):
-    sql = getUserByIdSQL(userId)
-    cursor.execute(sql)
-    ret = [row for row in cursor]
-    if len(ret) != 1:
-        raise HTTPException(status_code=404, detail="User not found")
-    return ret
+@app.get(
+    "/users/{user_id}",
+    response_model=ResponseModel,
+    status_code=status.HTTP_200_OK,
+    responses={
+        status.HTTP_404_NOT_FOUND: {"description": "User Not Found"}
+    },
+    tags=["Users"]
+)
+async def get_user(
+        user_id: Annotated[
+            int,
+            Path(description="User ID of user to retrieve")
+        ]
+    ):
+    """
+    Retrieve user info by user ID.
+    """
 
+    sql = get_user_by_id_sql(user_id)
 
-@app.get("/users")
-async def getUsers():
-    sql = getUsersSQL()
-    cursor.execute(sql)
-    ret = [row for row in cursor]
-    return ret
-
-
-@app.post("/users")
-async def createUser(user: User):
-    sql = createUserSQL(user.id, user.username, user.email, user.isAdmin)
-    print(sql)
     try:
         cursor.execute(sql)
-    except:
-        raise HTTPException(status_code=500)
-    return user
+        ret = cursor.fetchall()
+        if len(ret) != 1:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, 
+                detail="User not found"
+            )
+        
+        links = [
+            {"rel": "self", "href": f"/users/{user_id}"},
+            {"rel": "all_users", "href": "/users"},
+            {"rel": "update", "href": f"/users/{user_id}"}
+        ]
+        response = format_response(data=ret[0], links=links)
+        return response
+    
+    except MySQLError as e:
+        raise HTTPException(status_code=500, detail="Database error: " + str(e))
 
 
-@app.put("/users/{userId}")
-async def updateUser(userId: int, user: User):
-    sql = updateUserSQL(userId, user)
+@app.get(
+    "/users", 
+    response_model=ResponseModel,
+    status_code=status.HTTP_200_OK,
+    tags=["Users"]
+)
+async def get_users(
+    limit: Optional[int] = 10,
+    offset: Optional[int] = 0
+):
+    sql = get_users_sql()
+    sql += f" LIMIT {limit} OFFSET {offset};"
+
     try:
         cursor.execute(sql)
-    except:
-        raise HTTPException(status_code=500)
-    return user
+        ret = cursor.fetchall()
+        links = [
+            {"rel": "self", "href": f"/users?limit={limit}&offset={offset}"},
+            {"rel": "next", "href": f"/users?limit={limit}&offset={offset + limit}" if len(ret) == limit else None},
+            {"rel": "prev", "href": f"/users?limit={limit}&offset={max(0, offset - limit)}" if offset > 0 else None}
+        ]
+        response = format_response(data=ret, links=links)
+        return response
+    
+    except MySQLError as e:
+        raise HTTPException(status_code=500, detail="Database error: " + str(e))
+
+
+@app.post(
+    "/users",
+    response_model=ResponseModel,
+    status_code=status.HTTP_201_CREATED,
+    tags=["Users"]
+)
+async def create_user(user: User):
+    sql = create_user_sql(user.id, user.username, user.email, user.is_admin) + ";"
+
+    try:
+        cursor.execute(sql)
+        links = [
+            {"rel": "self", "href": f"/users/{user.id}"},
+            {"rel": "update", "href": f"/users/{user.id}"}
+        ]
+        print(dict(user))
+        response = format_response(data=dict(user), links=links)
+        return response
+    
+    except MySQLError as e:
+        raise HTTPException(status_code=500, detail="Database error: " + str(e))
+
+
+@app.put(
+    "/users/{user_id}",
+    response_model=ResponseModel,
+    status_code=status.HTTP_200_OK,
+    tags=["Users"]
+)
+async def update_user(
+        user_id: Annotated[
+            int,
+            Path(description="User ID of user to update")
+        ], 
+        user: User
+    ):
+    sql = update_user_sql(user_id, user) + ";"
+
+    try:
+        cursor.execute(sql)
+        links = [
+            {"rel": "self", "href": f"/users/{user.id}"}
+        ]
+        response = format_response(data=user, links=links)
+        return response
+    
+    except MySQLError as e:
+        raise HTTPException(status_code=500, detail="Database error: " + str(e))
 
 
 if __name__ == "__main__":
