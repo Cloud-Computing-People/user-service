@@ -242,6 +242,29 @@ async def add_balance(
         connection.rollback()
         raise HTTPException(status_code=500, detail=" Balance update failed: " + str(e))
 
+# endpoint to retrieve user balance
+@app.get("/users/{user_id}/balance", response_model=ResponseModel, summary="Retrieve user balance")
+async def get_balance(user_id: int = Path(..., description="ID of the user whose balance will be retrieved.")):
+    try:
+        sql = get_balance_sql(user_id)
+        cursor.execute(sql)
+        ret = cursor.fetchone()
+        if not ret:
+            raise HTTPException(status_code=404, detail="User not found.")
+        
+        links = {
+            "self": f"/users/{user_id}/balance",
+            "add_balance": f"/users/{user_id}/balance/add",
+            "deduct_balance": f"/users/{user_id}/balance/deduct"
+        }
+
+        return ResponseModel(
+            data={"totalCurrency": ret["totalCurrency"]},
+            links=links)
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Unable to retrieve balance: " + str(e))
+
 if __name__ == "__main__":
     import uvicorn
 
