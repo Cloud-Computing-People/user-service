@@ -24,4 +24,4 @@ class UserLogin(BaseModel):
 
 class ResponseModel(BaseModel):
     data: Any
-    links: Optional[List[Dict[str, Optional[str]]]] = None
+    links: Optional[Dict[str, Optional[str]]] = None

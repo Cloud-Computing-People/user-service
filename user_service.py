@@ -49,7 +49,7 @@ connection = pymysql.connect(
     host=os.getenv("DB_HOST"),
     user=os.getenv("DB_USER"),
     password=os.getenv("DB_PASSWORD"),
-    database="userdb",
+    database="ccpdb",
 )
 cursor = connection.cursor(pymysql.cursors.DictCursor)
 
@@ -57,28 +57,26 @@ cursor = connection.cursor(pymysql.cursors.DictCursor)
 @app.get(
     "/users/{user_id}",
     response_model=ResponseModel,
-    status_code=status.HTTP_200_OK,
-    responses={
-        status.HTTP_404_NOT_FOUND: {"description": "User Not Found"}
-    },
-    tags=["Users"]
-)
+    status_code=status.HTTP_200_OK)
 async def get_user(
         user_id: Annotated[
             int,
             Path(description="User ID of user to retrieve")
-        ]
+        ],
+        include_player_data: Optional[bool] = False
     ):
     """
     Retrieve user info by user ID.
     """
 
     sql = get_user_by_id_sql(user_id)
+    if include_player_data:
+        sql = get_user_player_by_id_sql(user_id)
 
     try:
         cursor.execute(sql)
-        ret = cursor.fetchall()
-        if len(ret) != 1:
+        ret = cursor.fetchone()
+        if not ret:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, 
                 detail="User not found"
@@ -89,7 +87,7 @@ async def get_user(
             {"rel": "all_users", "href": "/users"},
             {"rel": "update", "href": f"/users/{user_id}"}
         ]
-        response = format_response(data=ret[0], links=links)
+        response = format_response(data=ret, links=links)
         return response
     
     except MySQLError as e:
@@ -173,6 +171,94 @@ async def update_user(
     except MySQLError as e:
         raise HTTPException(status_code=500, detail="Database error: " + str(e))
 
+@app.post("/users/{user_id}/balance/add", response_model=ResponseModel, summary="Add balance to user's account")
+async def add_balance(
+    user_id: Annotated[int, Path(description="ID of the user whose balance will be updated.")],
+    amount: float
+):
+    try:
+        sql = get_user_by_id_sql(user_id)
+        cursor.execute(sql)
+        ret = cursor.fetchone()
+        if not ret:
+            raise HTTPException(status_code=404, detail="User not found.")
+        
+        sql = add_balance_sql(user_id, amount)
+        cursor.execute(sql)
+        connection.commit()
+        
+        links = {
+            "self": f"/users/{user_id}/balance/add",
+            "user": f"/users/{user_id}",
+            "deduct_balance": f"/users/{user_id}/balance/deduct"
+        }
+
+        return ResponseModel(
+            data={},
+            links=links)
+    
+    except Exception as e:
+        connection.rollback()
+        raise HTTPException(status_code=500, detail=" Balance update failed: " + str(e))
+    
+@app.post("/users/{user_id}/balance/deduct", response_model=ResponseModel, summary="Deduct balance to user's account")
+async def deduct_balance(
+    user_id: Annotated[int, Path(description="ID of the user whose balance will be updated.")],
+    amount: float,
+):
+    try:
+        sql = get_user_by_id_sql(user_id)
+        cursor.execute(sql)
+        ret = cursor.fetchone()
+        if not ret:
+            raise HTTPException(status_code=404, detail="User not found.")
+        
+        sql = get_balance_sql(user_id)
+        cursor.execute(sql)
+        ret = cursor.fetchone()
+        if ret["totalCurrency"] < amount:
+            raise HTTPException(status_code=400, detail="User does not have enough funds.")
+
+        sql = deduct_balance_sql(user_id, amount)
+        cursor.execute(sql)
+        connection.commit()
+        
+        links = {
+            "self": f"/users/{user_id}/balance/deduct",
+            "user": f"/users/{user_id}",
+            "add_balance": f"/users/{user_id}/balance/add"
+        }
+
+        return ResponseModel(
+            data={},
+            links=links)
+    
+    except Exception as e:
+        connection.rollback()
+        raise HTTPException(status_code=500, detail=" Balance update failed: " + str(e))
+
+# endpoint to retrieve user balance
+@app.get("/users/{user_id}/balance", response_model=ResponseModel, summary="Retrieve user balance")
+async def get_balance(user_id: int = Path(..., description="ID of the user whose balance will be retrieved.")):
+    try:
+        sql = get_balance_sql(user_id)
+        cursor.execute(sql)
+        ret = cursor.fetchone()
+        if not ret:
+            raise HTTPException(status_code=404, detail="User not found.")
+        
+        links = {
+            "self": f"/users/{user_id}/balance",
+            "add_balance": f"/users/{user_id}/balance/add",
+            "deduct_balance": f"/users/{user_id}/balance/deduct"
+        }
+
+        return ResponseModel(
+            data={"totalCurrency": ret["totalCurrency"]},
+            links=links)
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Unable to retrieve balance: " + str(e))
 
 if __name__ == "__main__":
     import uvicorn
