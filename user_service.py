@@ -67,18 +67,21 @@ async def get_user(
         user_id: Annotated[
             int,
             Path(description="User ID of user to retrieve")
-        ]
+        ],
+        include_player_data: Annotated[bool, Path(description="Whether or not player data should be included")]
     ):
     """
     Retrieve user info by user ID.
     """
 
     sql = get_user_by_id_sql(user_id)
+    if include_player_data:
+        sql = get_user_player_by_id_sql(user_id)
 
     try:
         cursor.execute(sql)
-        ret = cursor.fetchall()
-        if len(ret) != 1:
+        ret = cursor.fetchone()
+        if not ret:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, 
                 detail="User not found"
@@ -173,6 +176,71 @@ async def update_user(
     except MySQLError as e:
         raise HTTPException(status_code=500, detail="Database error: " + str(e))
 
+@app.post("/users/{user_id}/balance/add", response_model=ResponseModel, summary="Add balance to user's account")
+async def add_balance(
+    user_id: Annotated[int, Path(description="ID of the user whose balance will be updated.")],
+    amount: Annotated[float, Path(description="Amount to add to the user's balance.")],
+):
+    try:
+        sql = get_user_by_id_sql(user_id)
+        cursor.execute(sql)
+        ret = cursor.fetchone()
+        if not ret:
+            raise HTTPException(status_code=404, detail="User not found.")
+        
+        sql = add_balance_sql(user_id, amount)
+        cursor.execute(sql)
+        connection.commit()
+        
+        links = {
+            "self": f"/users/{user_id}/balance/add",
+            "user": f"/users/{user_id}",
+            "deduct_balance": f"/users/{user_id}/balance/deduct"
+        }
+
+        return ResponseModel(
+            data={"totalCurrency": ret["totalCurrency"]},
+            links=links)
+    
+    except Exception as e:
+        connection.rollback()
+        raise HTTPException(status_code=500, detail=" Balance update failed: " + str(e))
+    
+@app.post("/users/{user_id}/balance/deduct", response_model=ResponseModel, summary="Deduct balance to user's account")
+async def add_balance(
+    user_id: Annotated[int, Path(description="ID of the user whose balance will be updated.")],
+    amount: Annotated[float, Path(description="Amount to add to the user's balance.")],
+):
+    try:
+        sql = get_user_by_id_sql(user_id)
+        cursor.execute(sql)
+        ret = cursor.fetchone()
+        if not ret:
+            raise HTTPException(status_code=404, detail="User not found.")
+        
+        sql = get_balance_sql(user_id)
+        cursor.execute(sql)
+        ret = cursor.fetchone()
+        if ret < amount:
+            raise HTTPException(status_code=400, detail="User does not have enough funds.")
+
+        sql = deduct_balance_sql(user_id, amount)
+        cursor.execute(sql)
+        connection.commit()
+        
+        links = {
+            "self": f"/users/{user_id}/balance/deduct",
+            "user": f"/users/{user_id}",
+            "add_balance": f"/users/{user_id}/balance/add"
+        }
+
+        return ResponseModel(
+            data={"totalCurrency": ret["totalCurrency"]},
+            links=links)
+    
+    except Exception as e:
+        connection.rollback()
+        raise HTTPException(status_code=500, detail=" Balance update failed: " + str(e))
 
 if __name__ == "__main__":
     import uvicorn
