@@ -19,4 +19,8 @@ class UserLogin(BaseModel):
 
 class ResponseModel(BaseModel):
     data: Any
+<<<<<<< HEAD
     links: Optional[List[Dict[str, str]]] = None
+=======
+    links: Optional[Dict[str, Optional[str]]] = None
+>>>>>>> af7466e (fix links x2)

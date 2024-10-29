@@ -68,13 +68,13 @@ async def get_user(
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
             )
-
-        links = [
-            {"rel": "self", "href": f"/users/{user_id}"},
-            {"rel": "all_users", "href": "/users"},
-            {"rel": "update", "href": f"/users/{user_id}"},
-        ]
-        response = format_response(data=ret, links=links)
+        
+        links = {
+            "self": f"/users/{user_id}",
+            "all_users": "/users",
+            "update": f"/users/{user_id}"
+        }
+        response = format_response(data=ret[0], links=links)
         return response
 
     except MySQLError as e:
@@ -94,21 +94,11 @@ async def get_users(limit: Optional[int] = 10, offset: Optional[int] = 0):
     try:
         cursor.execute(sql)
         ret = cursor.fetchall()
-        links = [
-            {"rel": "self", "href": f"/users?limit={limit}&offset={offset}"},
-            {
-                "rel": "next",
-                "href": f"/users?limit={limit}&offset={offset + limit}"
-                if len(ret) == limit
-                else "",
-            },
-            {
-                "rel": "prev",
-                "href": f"/users?limit={limit}&offset={max(0, offset - limit)}"
-                if offset > 0
-                else "",
-            },
-        ]
+        links = {
+            "self": f"/users?limit={limit}&offset={offset}",
+            "next": f"/users?limit={limit}&offset={offset + limit}" if len(ret) == limit else None,
+            "prev": f"/users?limit={limit}&offset={max(0, offset - limit)}" if offset > 0 else None
+        }
         response = format_response(data=ret, links=links)
         return response
 
@@ -127,10 +117,10 @@ async def create_user(user: User):
 
     try:
         cursor.execute(sql)
-        links = [
-            {"rel": "self", "href": f"/users/{user.id}"},
-            {"rel": "update", "href": f"/users/{user.id}"},
-        ]
+        links = {
+            "self": f"/users/{user.id}",
+            "update": f"/users/{user.id}"
+        }
         print(dict(user))
         response = format_response(data=dict(user), links=links)
         return response
@@ -152,7 +142,7 @@ async def update_user(
 
     try:
         cursor.execute(sql)
-        links = [{"rel": "self", "href": f"/users/{user.id}"}]
+        links = {"self": f"/users/{user.id}"}
         response = format_response(data=user, links=links)
         return response
 
