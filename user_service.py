@@ -100,13 +100,13 @@ async def get_users(limit: Optional[int] = 10, offset: Optional[int] = 0):
                 "rel": "next",
                 "href": f"/users?limit={limit}&offset={offset + limit}"
                 if len(ret) == limit
-                else None,
+                else "",
             },
             {
                 "rel": "prev",
                 "href": f"/users?limit={limit}&offset={max(0, offset - limit)}"
                 if offset > 0
-                else None,
+                else "",
             },
         ]
         response = format_response(data=ret, links=links)
