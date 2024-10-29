@@ -182,11 +182,11 @@ async def add_balance(
         cursor.execute(sql)
         connection.commit()
 
-        links = {
-            "self": f"/users/{user_id}/balance/add",
-            "user": f"/users/{user_id}",
-            "deduct_balance": f"/users/{user_id}/balance/deduct",
-        }
+        links = [
+            {"rel": "self", "href": f"/users/{user_id}/balance/add"},
+            {"rel": "user", "href": f"/users/{user_id}"},
+            {"rel": "deduct_balance", "href": f"/users/{user_id}/balance/deduct"},
+        ]
 
         return ResponseModel(data={}, links=links)
 
@@ -225,11 +225,11 @@ async def deduct_balance(
         cursor.execute(sql)
         connection.commit()
 
-        links = {
-            "self": f"/users/{user_id}/balance/deduct",
-            "user": f"/users/{user_id}",
-            "add_balance": f"/users/{user_id}/balance/add",
-        }
+        links = [
+            {"rel": "self", "href": f"/users/{user_id}/balance/deduct"},
+            {"rel": "user", "href": f"/users/{user_id}"},
+            {"rel": "add_balance", "href": f"/users/{user_id}/balance/add"},
+        ]
 
         return ResponseModel(data={}, links=links)
 
@@ -256,11 +256,11 @@ async def get_balance(
         if not ret:
             raise HTTPException(status_code=404, detail="User not found.")
 
-        links = {
-            "self": f"/users/{user_id}/balance",
-            "add_balance": f"/users/{user_id}/balance/add",
-            "deduct_balance": f"/users/{user_id}/balance/deduct",
-        }
+        links = [
+            {"rel": "self", "href": f"/users/{user_id}/balance"},
+            {"rel": "add_balance", "href": f"/users/{user_id}/balance/add"},
+            {"rel": "deduct_balance", "href": f"/users/{user_id}/balance/deduct"},
+        ]
 
         return ResponseModel(data={"totalCurrency": ret["totalCurrency"]}, links=links)
 
