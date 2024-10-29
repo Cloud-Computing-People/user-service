@@ -4,6 +4,7 @@ from fastapi import FastAPI, HTTPException, Depends, Query, Path, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from middleware import LoggingMiddleware
 import pymysql
 from pymysql import MySQLError
 from models import *
@@ -37,6 +38,8 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"]
 )
+app.add_middleware(LoggingMiddleware)
+
 connection = pymysql.connect(
     host=os.getenv("DB_HOST"),
     user=os.getenv("DB_USER"),
