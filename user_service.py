@@ -74,7 +74,7 @@ async def get_user(
             "all_users": "/users",
             "update": f"/users/{user_id}"
         }
-        response = format_response(data=ret[0], links=links)
+        response = format_response(data=ret, links=links)
         return response
 
     except MySQLError as e:
