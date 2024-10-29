@@ -28,18 +28,10 @@ Functionality includes the ability to:
 """
 version = "0.0.1"
 
-tags_metadata = [
-    {
-        "name": "Users",
-        "description": "Basic operations on users."
-    }
-]
+tags_metadata = [{"name": "Users", "description": "Basic operations on users."}]
 
 app = FastAPI(
-    title=title,
-    description=description,
-    version=version,
-    openapi_tags=tags_metadata
+    title=title, description=description, version=version, openapi_tags=tags_metadata
 )
 
 app.add_middleware(
@@ -49,22 +41,18 @@ connection = pymysql.connect(
     host=os.getenv("DB_HOST"),
     user=os.getenv("DB_USER"),
     password=os.getenv("DB_PASSWORD"),
-    database="ccpdb",
+    database="userdb",
 )
 cursor = connection.cursor(pymysql.cursors.DictCursor)
 
 
 @app.get(
-    "/users/{user_id}",
-    response_model=ResponseModel,
-    status_code=status.HTTP_200_OK)
+    "/users/{user_id}", response_model=ResponseModel, status_code=status.HTTP_200_OK
+)
 async def get_user(
-        user_id: Annotated[
-            int,
-            Path(description="User ID of user to retrieve")
-        ],
-        include_player_data: Optional[bool] = False
-    ):
+    user_id: Annotated[int, Path(description="User ID of user to retrieve")],
+    include_player_data: Optional[bool] = False,
+):
     """
     Retrieve user info by user ID.
     """
@@ -78,32 +66,28 @@ async def get_user(
         ret = cursor.fetchone()
         if not ret:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, 
-                detail="User not found"
+                status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
             )
-        
+
         links = [
             {"rel": "self", "href": f"/users/{user_id}"},
             {"rel": "all_users", "href": "/users"},
-            {"rel": "update", "href": f"/users/{user_id}"}
+            {"rel": "update", "href": f"/users/{user_id}"},
         ]
         response = format_response(data=ret, links=links)
         return response
-    
+
     except MySQLError as e:
         raise HTTPException(status_code=500, detail="Database error: " + str(e))
 
 
 @app.get(
-    "/users", 
+    "/users",
     response_model=ResponseModel,
     status_code=status.HTTP_200_OK,
-    tags=["Users"]
+    tags=["Users"],
 )
-async def get_users(
-    limit: Optional[int] = 10,
-    offset: Optional[int] = 0
-):
+async def get_users(limit: Optional[int] = 10, offset: Optional[int] = 0):
     sql = get_users_sql()
     sql += f" LIMIT {limit} OFFSET {offset};"
 
@@ -112,12 +96,22 @@ async def get_users(
         ret = cursor.fetchall()
         links = [
             {"rel": "self", "href": f"/users?limit={limit}&offset={offset}"},
-            {"rel": "next", "href": f"/users?limit={limit}&offset={offset + limit}" if len(ret) == limit else None},
-            {"rel": "prev", "href": f"/users?limit={limit}&offset={max(0, offset - limit)}" if offset > 0 else None}
+            {
+                "rel": "next",
+                "href": f"/users?limit={limit}&offset={offset + limit}"
+                if len(ret) == limit
+                else None,
+            },
+            {
+                "rel": "prev",
+                "href": f"/users?limit={limit}&offset={max(0, offset - limit)}"
+                if offset > 0
+                else None,
+            },
         ]
         response = format_response(data=ret, links=links)
         return response
-    
+
     except MySQLError as e:
         raise HTTPException(status_code=500, detail="Database error: " + str(e))
 
@@ -126,7 +120,7 @@ async def get_users(
     "/users",
     response_model=ResponseModel,
     status_code=status.HTTP_201_CREATED,
-    tags=["Users"]
+    tags=["Users"],
 )
 async def create_user(user: User):
     sql = create_user_sql(user.id, user.username, user.email, user.is_admin) + ";"
@@ -135,12 +129,12 @@ async def create_user(user: User):
         cursor.execute(sql)
         links = [
             {"rel": "self", "href": f"/users/{user.id}"},
-            {"rel": "update", "href": f"/users/{user.id}"}
+            {"rel": "update", "href": f"/users/{user.id}"},
         ]
         print(dict(user))
         response = format_response(data=dict(user), links=links)
         return response
-    
+
     except MySQLError as e:
         raise HTTPException(status_code=500, detail="Database error: " + str(e))
 
@@ -149,61 +143,32 @@ async def create_user(user: User):
     "/users/{user_id}",
     response_model=ResponseModel,
     status_code=status.HTTP_200_OK,
-    tags=["Users"]
+    tags=["Users"],
 )
 async def update_user(
-        user_id: Annotated[
-            int,
-            Path(description="User ID of user to update")
-        ], 
-        user: User
-    ):
+    user_id: Annotated[int, Path(description="User ID of user to update")], user: User
+):
     sql = update_user_sql(user_id, user) + ";"
 
     try:
         cursor.execute(sql)
-        links = [
-            {"rel": "self", "href": f"/users/{user.id}"}
-        ]
+        links = [{"rel": "self", "href": f"/users/{user.id}"}]
         response = format_response(data=user, links=links)
         return response
-    
+
     except MySQLError as e:
         raise HTTPException(status_code=500, detail="Database error: " + str(e))
 
-@app.post("/users/{user_id}/balance/add", response_model=ResponseModel, summary="Add balance to user's account")
-async def add_balance(
-    user_id: Annotated[int, Path(description="ID of the user whose balance will be updated.")],
-    amount: float
-):
-    try:
-        sql = get_user_by_id_sql(user_id)
-        cursor.execute(sql)
-        ret = cursor.fetchone()
-        if not ret:
-            raise HTTPException(status_code=404, detail="User not found.")
-        
-        sql = add_balance_sql(user_id, amount)
-        cursor.execute(sql)
-        connection.commit()
-        
-        links = {
-            "self": f"/users/{user_id}/balance/add",
-            "user": f"/users/{user_id}",
-            "deduct_balance": f"/users/{user_id}/balance/deduct"
-        }
 
-        return ResponseModel(
-            data={},
-            links=links)
-    
-    except Exception as e:
-        connection.rollback()
-        raise HTTPException(status_code=500, detail=" Balance update failed: " + str(e))
-    
-@app.post("/users/{user_id}/balance/deduct", response_model=ResponseModel, summary="Deduct balance to user's account")
-async def deduct_balance(
-    user_id: Annotated[int, Path(description="ID of the user whose balance will be updated.")],
+@app.post(
+    "/users/{user_id}/balance/add",
+    response_model=ResponseModel,
+    summary="Add balance to user's account",
+)
+async def add_balance(
+    user_id: Annotated[
+        int, Path(description="ID of the user whose balance will be updated.")
+    ],
     amount: float,
 ):
     try:
@@ -212,53 +177,98 @@ async def deduct_balance(
         ret = cursor.fetchone()
         if not ret:
             raise HTTPException(status_code=404, detail="User not found.")
-        
-        sql = get_balance_sql(user_id)
-        cursor.execute(sql)
-        ret = cursor.fetchone()
-        if ret["totalCurrency"] < amount:
-            raise HTTPException(status_code=400, detail="User does not have enough funds.")
 
-        sql = deduct_balance_sql(user_id, amount)
+        sql = add_balance_sql(user_id, amount)
         cursor.execute(sql)
         connection.commit()
-        
+
         links = {
-            "self": f"/users/{user_id}/balance/deduct",
+            "self": f"/users/{user_id}/balance/add",
             "user": f"/users/{user_id}",
-            "add_balance": f"/users/{user_id}/balance/add"
+            "deduct_balance": f"/users/{user_id}/balance/deduct",
         }
 
-        return ResponseModel(
-            data={},
-            links=links)
-    
+        return ResponseModel(data={}, links=links)
+
     except Exception as e:
         connection.rollback()
         raise HTTPException(status_code=500, detail=" Balance update failed: " + str(e))
 
+
+@app.post(
+    "/users/{user_id}/balance/deduct",
+    response_model=ResponseModel,
+    summary="Deduct balance to user's account",
+)
+async def deduct_balance(
+    user_id: Annotated[
+        int, Path(description="ID of the user whose balance will be updated.")
+    ],
+    amount: float,
+):
+    try:
+        sql = get_user_by_id_sql(user_id)
+        cursor.execute(sql)
+        ret = cursor.fetchone()
+        if not ret:
+            raise HTTPException(status_code=404, detail="User not found.")
+
+        sql = get_balance_sql(user_id)
+        cursor.execute(sql)
+        ret = cursor.fetchone()
+        if ret["totalCurrency"] < amount:
+            raise HTTPException(
+                status_code=400, detail="User does not have enough funds."
+            )
+
+        sql = deduct_balance_sql(user_id, amount)
+        cursor.execute(sql)
+        connection.commit()
+
+        links = {
+            "self": f"/users/{user_id}/balance/deduct",
+            "user": f"/users/{user_id}",
+            "add_balance": f"/users/{user_id}/balance/add",
+        }
+
+        return ResponseModel(data={}, links=links)
+
+    except Exception as e:
+        connection.rollback()
+        raise HTTPException(status_code=500, detail=" Balance update failed: " + str(e))
+
+
 # endpoint to retrieve user balance
-@app.get("/users/{user_id}/balance", response_model=ResponseModel, summary="Retrieve user balance")
-async def get_balance(user_id: int = Path(..., description="ID of the user whose balance will be retrieved.")):
+@app.get(
+    "/users/{user_id}/balance",
+    response_model=ResponseModel,
+    summary="Retrieve user balance",
+)
+async def get_balance(
+    user_id: int = Path(
+        ..., description="ID of the user whose balance will be retrieved."
+    ),
+):
     try:
         sql = get_balance_sql(user_id)
         cursor.execute(sql)
         ret = cursor.fetchone()
         if not ret:
             raise HTTPException(status_code=404, detail="User not found.")
-        
+
         links = {
             "self": f"/users/{user_id}/balance",
             "add_balance": f"/users/{user_id}/balance/add",
-            "deduct_balance": f"/users/{user_id}/balance/deduct"
+            "deduct_balance": f"/users/{user_id}/balance/deduct",
         }
 
-        return ResponseModel(
-            data={"totalCurrency": ret["totalCurrency"]},
-            links=links)
-    
+        return ResponseModel(data={"totalCurrency": ret["totalCurrency"]}, links=links)
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail="Unable to retrieve balance: " + str(e))
+        raise HTTPException(
+            status_code=500, detail="Unable to retrieve balance: " + str(e)
+        )
+
 
 if __name__ == "__main__":
     import uvicorn
