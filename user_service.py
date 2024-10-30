@@ -50,7 +50,10 @@ cursor = connection.cursor(pymysql.cursors.DictCursor)
 
 
 @app.get(
-    "/users/{user_id}", response_model=ResponseModel, status_code=status.HTTP_200_OK
+    "/users/{user_id}",
+    response_model=ResponseModel,
+    status_code=status.HTTP_200_OK,
+    tags=["Users"],
 )
 async def get_user(
     user_id: Annotated[int, Path(description="User ID of user to retrieve")],
@@ -157,6 +160,7 @@ async def update_user(
     "/users/{user_id}/balance/add",
     response_model=ResponseModel,
     summary="Add balance to user's account",
+    tags=["Users"],
 )
 async def add_balance(
     user_id: Annotated[
@@ -191,7 +195,8 @@ async def add_balance(
 @app.post(
     "/users/{user_id}/balance/deduct",
     response_model=ResponseModel,
-    summary="Deduct balance to user's account",
+    summary="Deduct balance from user's account",
+    tags=["Users"],
 )
 async def deduct_balance(
     user_id: Annotated[
@@ -236,6 +241,7 @@ async def deduct_balance(
     "/users/{user_id}/balance",
     response_model=ResponseModel,
     summary="Retrieve user balance",
+    tags=["Users"],
 )
 async def get_balance(
     user_id: int = Path(
