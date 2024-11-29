@@ -4,13 +4,13 @@ from fastapi import FastAPI, HTTPException, Depends, Query, Path, status, Reques
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from middleware import LoggingMiddleware, RequestIDMiddleware, OverallMiddleware
 import pymysql
 from pymysql import MySQLError
 from models import *
 from sql_queries import *
 from typing import Annotated, List
 from utils import *
+from middleware import OverallMiddleware
 
 load_dotenv()
 
