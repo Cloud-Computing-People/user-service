@@ -1,10 +1,10 @@
 import os
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Depends, Query, Path, status
+from fastapi import FastAPI, HTTPException, Depends, Query, Path, status, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from middleware import LoggingMiddleware
+from middleware import LoggingMiddleware, RequestIDMiddleware, OverallMiddleware
 import pymysql
 from pymysql import MySQLError
 from models import *
@@ -38,7 +38,8 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"]
 )
-app.add_middleware(LoggingMiddleware)
+app.add_middleware(OverallMiddleware)
+
 
 connection = pymysql.connect(
     host=os.getenv("DB_HOST"),
