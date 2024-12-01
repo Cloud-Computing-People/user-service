@@ -26,3 +26,9 @@ def deduct_balance_sql(user_id, amount):
 
 def get_balance_sql(user_id):
     return f"SELECT totalCurrency from PLAYER_DATA WHERE id={user_id}"
+
+def get_user_by_email_sql(email):
+    return f"SELECT * FROM USERS WHERE email='{email}'"
+
+def get_user_player_by_email_sql(email):
+    return f"SELECT * FROM USERS, PLAYER_DATA WHERE USERS.email='{email}' and USERS.id=PLAYER_DATA.id"

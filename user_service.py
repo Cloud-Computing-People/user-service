@@ -84,6 +84,39 @@ async def get_user(
     except MySQLError as e:
         raise HTTPException(status_code=500, detail="Database error: " + str(e))
 
+# get user by email ID
+@app.get(
+    "/users/email/{email}", response_model=ResponseModel, status_code=status.HTTP_200_OK
+)
+async def get_user_by_email(
+    email: Annotated[str, Path(description="Email ID of user to retrieve")],
+    include_player_data: Optional[bool] = False,
+):
+    """
+    Retrieve user info by email ID.
+    """
+    sql = get_user_by_email_sql(email)
+    if include_player_data:
+        sql = get_user_player_by_email_sql(email)
+
+    try:
+        cursor.execute(sql)
+        ret = cursor.fetchone()
+        if not ret:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+            )
+        
+        links = {
+            "self": f"/users/email/{email}",
+            "all_users": "/users",
+            "update": f"/users/{ret['id']}"
+        }
+        response = format_response(data=ret, links=links)
+        return response
+
+    except MySQLError as e:
+        raise HTTPException(status_code=500, detail="Database error: " + str(e))
 
 @app.get(
     "/users",
@@ -117,9 +150,17 @@ async def get_users(limit: Optional[int] = 10, offset: Optional[int] = 0):
     tags=["Users"],
 )
 async def create_user(user: User):
-    sql = create_user_sql(user.id, user.username, user.email, user.is_admin) + ";"
-
     try:
+        # make sure user doesn't exist with same email
+        sql_check = get_user_by_email_sql(user.email)
+        cursor.execute(sql_check)
+        ret = cursor.fetchone()
+        if ret:
+            raise HTTPException(
+                status_code=400, detail="User with email already exists."
+            )
+        
+        sql = create_user_sql(user.id, user.username, user.email, user.is_admin)
         cursor.execute(sql)
         links = {
             "self": f"/users/{user.id}",
