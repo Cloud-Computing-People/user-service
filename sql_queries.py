@@ -8,7 +8,7 @@ def get_user_player_by_id_sql(user_id):
     return f"SELECT * FROM USERS, PLAYER_DATA WHERE USERS.id={user_id} and USERS.id=PLAYER_DATA.id"
 
 def get_users_sql():
-    return "SELECT * FROM USERS"
+    return "SELECT * FROM USERSA"
 
 
 def create_user_sql(user_id, username, email, is_admin):

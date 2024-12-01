@@ -10,7 +10,7 @@ from models import *
 from sql_queries import *
 from typing import Annotated, List
 from utils import *
-from middleware import OverallMiddleware
+from middleware import OverallMiddleware, http_exception_handler, generic_exception_handler
 
 load_dotenv()
 
@@ -39,6 +39,9 @@ app.add_middleware(
     CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"]
 )
 app.add_middleware(OverallMiddleware)
+
+# app.add_exception_handler(HTTPException, http_exception_handler)
+# app.add_exception_handler(Exception, generic_exception_handler)
 
 
 connection = pymysql.connect(
