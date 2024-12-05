@@ -11,6 +11,8 @@ from sql_queries import *
 from typing import Annotated, List
 from utils import *
 from middleware import OverallMiddleware, http_exception_handler, generic_exception_handler
+from pub_utils import publish_event
+
 
 load_dotenv()
 
@@ -39,9 +41,6 @@ app.add_middleware(
     CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"]
 )
 app.add_middleware(OverallMiddleware)
-
-# app.add_exception_handler(HTTPException, http_exception_handler)
-# app.add_exception_handler(Exception, generic_exception_handler)
 
 
 connection = pymysql.connect(
@@ -87,7 +86,6 @@ async def get_user(
     except MySQLError as e:
         raise HTTPException(status_code=500, detail="Database error: " + str(e))
 
-# get user by email ID
 @app.get(
     "/users/email/{email}", response_model=ResponseModel, status_code=status.HTTP_200_OK
 )
@@ -152,9 +150,8 @@ async def get_users(limit: Optional[int] = 10, offset: Optional[int] = 0):
     status_code=status.HTTP_201_CREATED,
     tags=["Users"],
 )
-async def create_user(user: User):
+async def create_user(user: UserCreate, request: Request):
     try:
-        # make sure user doesn't exist with same email
         sql_check = get_user_by_email_sql(user.email)
         cursor.execute(sql_check)
         ret = cursor.fetchone()
@@ -163,14 +160,31 @@ async def create_user(user: User):
                 status_code=400, detail="User with email already exists."
             )
         
-        sql = create_user_sql(user.id, user.username, user.email, user.is_admin)
+        sql = create_user_sql(user.username, user.email, user.isAdmin)
         cursor.execute(sql)
+        if not user.isAdmin:
+            cursor.execute(get_user_by_email_sql(user.email))
+            ret = cursor.fetchone()
+            sql = f"INSERT INTO PLAYER_DATA (id, profilePic, bio, totalCurrency, activeItem) VALUES ({ret['id']}, '', '', 0, NULL);"
+            cursor.execute(sql)
+        
+        connection.commit()
+        user = User(**user.model_dump(), id=ret["id"])
         links = {
             "self": f"/users/{user.id}",
             "update": f"/users/{user.id}"
         }
-        print(dict(user))
         response = format_response(data=dict(user), links=links)
+
+        event = UpdateEvent(
+            event_type="create",
+            entity="user",
+            entity_id=user.id,
+            data={**dict(user), "PLAYER_DATA.id": user.id, 'bio': '', 'profilePic': '', 'activeItem': None, "totalCurrency": 0},
+            request_id=request.state.request_id
+        )
+        publish_event(event.model_dump())
+
         return response
 
     except MySQLError as e:
@@ -184,14 +198,26 @@ async def create_user(user: User):
     tags=["Users"],
 )
 async def update_user(
-    user_id: Annotated[int, Path(description="User ID of user to update")], user: User
+    user_id: Annotated[int, Path(description="User ID of user to update")], user: User,
+    request: Request
 ):
     sql = update_user_sql(user_id, user) + ";"
 
     try:
         cursor.execute(sql)
+        connection.commit()
         links = {"self": f"/users/{user.id}"}
         response = format_response(data=user, links=links)
+
+        event = UpdateEvent(
+            event_type="update",
+            entity="user",
+            entity_id=user_id,
+            data=dict(user),
+            request_id=request.state.request_id
+        )
+        publish_event(event.model_dump())
+
         return response
 
     except MySQLError as e:
@@ -208,9 +234,10 @@ async def add_balance(
         int, Path(description="ID of the user whose balance will be updated.")
     ],
     amount: float,
+    request: Request
 ):
     try:
-        sql = get_user_by_id_sql(user_id)
+        sql = get_user_player_by_id_sql(user_id)
         cursor.execute(sql)
         ret = cursor.fetchone()
         if not ret:
@@ -225,6 +252,15 @@ async def add_balance(
             "user": f"/users/{user_id}",
             "deduct_balance": f"/users/{user_id}/balance/deduct"
         }
+
+        event = UpdateEvent(
+            event_type="update",
+            entity="user",
+            entity_id=user_id,
+            data={**ret, "totalCurrency": ret["totalCurrency"] + amount},
+            request_id=request.state.request_id
+        )
+        publish_event(event.model_dump())
 
         return ResponseModel(data={}, links=links)
 
@@ -243,9 +279,10 @@ async def deduct_balance(
         int, Path(description="ID of the user whose balance will be updated.")
     ],
     amount: float,
+    request: Request
 ):
     try:
-        sql = get_user_by_id_sql(user_id)
+        sql = get_user_player_by_id_sql(user_id)
         cursor.execute(sql)
         ret = cursor.fetchone()
         if not ret:
@@ -253,8 +290,8 @@ async def deduct_balance(
 
         sql = get_balance_sql(user_id)
         cursor.execute(sql)
-        ret = cursor.fetchone()
-        if ret["totalCurrency"] < amount:
+        c = cursor.fetchone()
+        if c["totalCurrency"] < amount:
             raise HTTPException(
                 status_code=400, detail="User does not have enough funds."
             )
@@ -262,6 +299,15 @@ async def deduct_balance(
         sql = deduct_balance_sql(user_id, amount)
         cursor.execute(sql)
         connection.commit()
+
+        event = UpdateEvent(
+            event_type="update",
+            entity="user",
+            entity_id=user_id,
+            data={**ret, "totalCurrency": ret["totalCurrency"] - amount},
+            request_id=request.state.request_id
+        )        
+        publish_event(event.model_dump())
 
         links = {
             "self": f"/users/{user_id}/balance/deduct",
@@ -276,7 +322,6 @@ async def deduct_balance(
         raise HTTPException(status_code=500, detail=" Balance update failed: " + str(e))
 
 
-# endpoint to retrieve user balance
 @app.get(
     "/users/{user_id}/balance",
     response_model=ResponseModel,
