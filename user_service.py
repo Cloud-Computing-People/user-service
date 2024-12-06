@@ -53,7 +53,8 @@ cursor = connection.cursor(pymysql.cursors.DictCursor)
 
 
 @app.get(
-    "/users/{user_id}", response_model=ResponseModel, status_code=status.HTTP_200_OK
+    "/users/{user_id}", response_model=ResponseModel, status_code=status.HTTP_200_OK,
+    tags=["Users"]
 )
 async def get_user(
     user_id: Annotated[int, Path(description="User ID of user to retrieve")],
@@ -87,7 +88,8 @@ async def get_user(
         raise HTTPException(status_code=500, detail="Database error: " + str(e))
 
 @app.get(
-    "/users/email/{email}", response_model=ResponseModel, status_code=status.HTTP_200_OK
+    "/users/email/{email}", response_model=ResponseModel, status_code=status.HTTP_200_OK,
+    tags=["Users"]
 )
 async def get_user_by_email(
     email: Annotated[str, Path(description="Email ID of user to retrieve")],
@@ -351,6 +353,31 @@ async def get_balance(
         raise HTTPException(
             status_code=500, detail="Unable to retrieve balance: " + str(e)
         )
+
+@app.put(
+    "/users/{user_id}/equip/{item_id}",
+)
+def equip_item(user_id: int, item_id: int, request: Request):
+    try:
+        sql = equip_item_sql(user_id, item_id)
+        cursor.execute(sql)
+        connection.commit()
+
+        event = UpdateEvent(
+            event_type="equip",
+            entity="user",
+            timestamp=datetime.now().isoformat(),
+            entity_id=user_id,
+            data={"activeItem": item_id},
+            request_id=request.state.request_id
+        )
+        publish_event(event.model_dump())
+
+        return JSONResponse(status_code=200, content={"message": "Item equipped."})
+
+    except Exception as e:
+        connection.rollback()
+        raise HTTPException(status_code=500, detail="Item equip failed: " + str(e))
 
 
 if __name__ == "__main__":

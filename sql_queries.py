@@ -30,3 +30,6 @@ def get_user_by_email_sql(email):
 
 def get_user_player_by_email_sql(email):
     return f"SELECT * FROM USERS, PLAYER_DATA WHERE USERS.email='{email}' and USERS.id=PLAYER_DATA.id"
+
+def equip_item_sql(user_id, item_id):
+    return f"UPDATE PLAYER_DATA SET activeItem={item_id} WHERE id={user_id}"

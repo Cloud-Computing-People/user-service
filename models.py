@@ -33,9 +33,9 @@ class ResponseModel(BaseModel):
 
 
 class UpdateEvent(BaseModel):
-    event_type: str = Field(..., description="The type of update")
-    entity: str = Field("user", description="The entity type associated with the event (user).")
-    timestamp: datetime = Field(default_factory=datetime.now, description="The timestamp when the event was generated.")
-    entity_id: int = Field(..., description="Unique identifier for the entiyy")
-    data: dict = Field(..., description="A dictionary containing the updated fields and their new values or new values")
-    request_id: str = Field(..., description="The request ID associated with the update for traceability across services")
+    event_type: Annotated[str, Field(description="The type of update")]
+    entity: Annotated[str, Field(default="user", description="The entity type associated with the event (user).")]
+    timestamp: Annotated[datetime, Field(default_factory=datetime.now, description="The timestamp when the event was generated.")]
+    entity_id: Annotated[int, Field(description="Unique identifier for the entity")]
+    data: Annotated[Dict[str, Any], Field(description="A dictionary containing the updated fields and their new values")]
+    request_id: Annotated[str, Field(description="The request ID associated with the update for traceability across services")]
