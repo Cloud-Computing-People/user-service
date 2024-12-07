@@ -1,6 +1,14 @@
 from starlette.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
+from fastapi import HTTPException
+import logging
+import time
+import uuid
+
+from starlette.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
 import logging
 import time
 import uuid
@@ -97,3 +105,18 @@ class OverallMiddleware:
 
     def __call__(self, scope, receive, call_next):
         return self.app(scope, receive, call_next)
+    
+
+async def http_exception_handler(request: Request, exc: HTTPException):
+    logging.error(f"[{request.state.request_id}] HTTPException: {exc.detail}")
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"message": exc.detail},
+    )
+
+async def generic_exception_handler(request: Request, exc: Exception):
+    logging.error(f"[{request.state.request_id}] Exception: {exc}")
+    return JSONResponse(
+        status_code=500,
+        content={"message": "An error occured: " + str(exc)},
+    )
