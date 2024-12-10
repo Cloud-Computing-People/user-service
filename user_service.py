@@ -185,7 +185,9 @@ async def create_user(user: UserCreate, request: Request):
             data={**dict(user), "PLAYER_DATA.id": user.id, 'bio': '', 'profilePic': '', 'activeItem': None, "totalCurrency": 0},
             request_id=request.state.request_id
         )
-        publish_event(event.model_dump())
+        
+        if os.environ.get("PUBLISH_EVENTS") == "True":
+            publish_event(event.model_dump())
 
         return response
 
@@ -218,7 +220,9 @@ async def update_user(
             data=dict(user),
             request_id=request.state.request_id
         )
-        publish_event(event.model_dump())
+        
+        if os.environ.get("PUBLISH_EVENTS") == "True":
+            publish_event(event.model_dump())
 
         return response
 
@@ -262,7 +266,9 @@ async def add_balance(
             data={**ret, "totalCurrency": ret["totalCurrency"] + amount},
             request_id=request.state.request_id
         )
-        publish_event(event.model_dump())
+        
+        if os.environ.get("PUBLISH_EVENTS") == "True":
+            publish_event(event.model_dump())
 
         return ResponseModel(data={}, links=links)
 
@@ -308,8 +314,10 @@ async def deduct_balance(
             entity_id=user_id,
             data={**ret, "totalCurrency": ret["totalCurrency"] - amount},
             request_id=request.state.request_id
-        )        
-        publish_event(event.model_dump())
+        )       
+
+        if os.environ.get("PUBLISH_EVENTS") == "True":
+            publish_event(event.model_dump())
 
         links = {
             "self": f"/users/{user_id}/balance/deduct",
@@ -371,7 +379,9 @@ def equip_item(user_id: int, item_id: int, request: Request):
             data={"activeItem": item_id},
             request_id=request.state.request_id
         )
-        publish_event(event.model_dump())
+        
+        if os.environ.get("PUBLISH_EVENTS") == "True":
+            publish_event(event.model_dump())
 
         return JSONResponse(status_code=200, content={"message": "Item equipped."})
 
