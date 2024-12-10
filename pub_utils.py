@@ -6,7 +6,7 @@ load_dotenv()
 
 app = Celery(
     "user_worker",
-    broker="redis://localhost:6379/0",
+    broker=f"{os.getenv('CELERY_BROKER_URL')}",
 )
 
 def publish_event(event):
